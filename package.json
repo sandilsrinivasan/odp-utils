@@ -1,0 +1,17 @@
+{
+  "name": "odp-utils",
+  "version": "1.0.0",
+  "description": "Omni Data Platform utilities",
+  "main": "odp-domain-utilities.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "clear": "^0.1.0",
+    "readline-sync": "^1.4.9",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.2"
+  }
+}
