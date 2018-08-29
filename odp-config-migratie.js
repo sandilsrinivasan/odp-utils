@@ -4,13 +4,14 @@ var clear = require('clear');
 clear();
 
 var readline = require('readline-sync');
+var sleep = require('sleep');
 const req = require('request-promise');
 const reqSync = require('sync-request');
 
 var DEFAULT = {
 	port: 32001,
-	sourceHostname: 'bifrost.odp.capiot.com',
-	targetHostname: 'bifrost.odp.capiot.com'
+	sourceHostname: 'sandbox.odp.capiot.com',
+	targetHostname: 'sandbox.odp.capiot.com'
 }
 
 const API = {
@@ -146,17 +147,21 @@ function getNewId(_oldId) {
 
 function allDependenciesDone(_service) {
 	var allDone = true;
-	console.log("Checking if all dependencies of " + _service.api + " are done");
+	// console.log("Checking if all dependencies of " + _service.api + " are done");
 	_service.relatedSchemas.outgoing.forEach((_dep) => {
-		// console.log("Checking: " + _dep.service);
-		toBeExported.forEach((service, i) => {
-			// console.log("Checking against: " + service._id);
-			if(service._id == _dep.service) {
-				if(!service.ocmExported) {
-					allDone = false;
+		if(allDone) {
+			// console.log("Checking: " + _dep.service);
+			toBeExported.forEach((service, i) => {
+				if(allDone) {
+					// console.log("Checking against: " + service._id + ", ocmExported = " + service.ocmExported);
+					if(service._id == _dep.service) {
+						if(!service.ocmExported) {
+							allDone = false;
+						}
+					}
 				}
-			}
-		});
+			});
+		}
 	});
 	return allDone;
 }
@@ -183,6 +188,8 @@ function createServices() {
 		});
 
 		do {
+
+			sleep.sleep(2);
 
 			toBeExported.forEach((service, i) => {
 
