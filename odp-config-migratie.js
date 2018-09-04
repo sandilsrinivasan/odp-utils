@@ -92,11 +92,10 @@ function getServices(_url, _token, _domain){
 	    json: true,
 	}
 
-	if (readline.keyInYN('Export only active services? ')) {
+	if (readline.keyInYN('Export only active services? '))
 		options.uri += '&filter={"domain":"' + _domain + '","status":"Active"}'
-	} else {
+	else
 		options.uri += '&filter={"domain":"' + _domain + '"}'
-	}
 	return req(options);
 }
 
@@ -119,6 +118,7 @@ function createDomain(_url, _token, _name, _description) {
 }
 
 function createService(_url, _token, _service) {
+	console.log("Creating service " + _service.name + " ... ");
 	var options = {
 		method: "POST",
 		uri: _url + API.service,
@@ -129,16 +129,13 @@ function createService(_url, _token, _service) {
 	    json: _service
 	}
 	var res = reqSync(options.method, options.uri, options);
-	// console.log(res.getBody('utf8'));;
+	console.log("Created service: " + _service.name + " with id: " + _service._id);
 	return JSON.parse(res.getBody('utf8'));
 }
 
 function getNewId(_oldId) {
 	var newId = null;
-	// console.log("_oldId = " + _oldId);
 	toBeExported.forEach((service, i) => {
-		// console.log("service._id = " + service._id);
-		// console.log("service.ocmExported = " + service.ocmExported);
 		if(service._id == _oldId && service.ocmExported)
 			newId = service.ocmId;
 	});
@@ -147,13 +144,10 @@ function getNewId(_oldId) {
 
 function allDependenciesDone(_service) {
 	var allDone = true;
-	// console.log("Checking if all dependencies of " + _service.api + " are done");
 	_service.relatedSchemas.outgoing.forEach((_dep) => {
 		if(allDone) {
-			// console.log("Checking: " + _dep.service);
 			toBeExported.forEach((service, i) => {
 				if(allDone) {
-					// console.log("Checking against: " + service._id + ", ocmExported = " + service.ocmExported);
 					if(service._id == _dep.service) {
 						if(!service.ocmExported) {
 							allDone = false;
@@ -209,18 +203,11 @@ function createServices() {
 					s.webHooks = service.webHooks;
 					s.wizard = service.wizard;
 
-					// Check if this service has any outgoing relationships
 					if(service.relatedSchemas.outgoing && service.relatedSchemas.outgoing.length > 0) {
-						// Check if all dependent services have already been exported
 						if(allDependenciesDone(service)) {
-							// enrich the IDs
-
 							for (var key in s.definition) {
-								// console.log("key = " + key);
-								// console.log("type = " + s.definition[key].type);
 								if(s.definition[key].properties && s.definition[key].properties.relatedTo) {
 									var newId = getNewId(s.definition[key].properties.relatedTo);
-									// console.log("old id = " + s.definition[key].properties.relatedTo + ", new id = " + newId);
 									var props = s.definition[key].properties;
 									s.definition[key] = {};
 									s.definition[key]._newField = false;
@@ -231,13 +218,7 @@ function createServices() {
 								}
 							}
 
-							// safe to export
-							// dirty hack
-							// because odp misbehaves with roles when hit too quickly
-							console.log("Creating service " + service.name + " ... ");
-							// console.log(JSON.stringify(s));
 							var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
-							console.log("Created service: " + service.name + " with id: " + _remoteService._id);
 							service.ocmId = _remoteService._id
 							service.ocmExported = true;
 						} else {
@@ -245,12 +226,7 @@ function createServices() {
 						}
 
 					} else {
-						// if not, it's safe to export
-						// dirty hack
-						// because odp misbehaves with roles when hit too quickly
-						console.log("Creating service " + service.name + " ... ");
 						var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
-						console.log("Created service: " + service.name + " with id: " + _remoteService._id);
 						service.ocmId = _remoteService._id
 						service.ocmExported = true;
 					}
