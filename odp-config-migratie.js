@@ -10,60 +10,32 @@ const reqSync = require('sync-request');
 
 var DEFAULT = {
 	port: 32001,
-	sourceHostname: 'sandbox.odp.capiot.com',
-	targetHostname: 'sandbox.odp.capiot.com'
+	sourceHostname: '',
+	targetHostname: ''
 }
 
 const API = {
     login: "/api/a/rbac/login",
     domain: "/api/a/rbac/domain",
-    service: "/api/a/sm/service"
+    service: "/api/a/sm/service",
+    role: "/api/a/rbac/role"
 }
 
 var CONFIG = {};
 
-console.log("Enter the source ODP details.");
-
-var sourceHost = readline.question('Host: [' + DEFAULT.sourceHostname + '] ', {
-  defaultInput: DEFAULT.sourceHostname
-
-});
-
-var sourcePort = readline.question('Port: [' + DEFAULT.port + '] ', {
-  defaultInput: DEFAULT.port
-});
-
-CONFIG.sourceUrl = "http://" + sourceHost + ":" + sourcePort;
-
-var sourceUsername = readline.question('Username: ');
-var sourcePassword = readline.question('Password: ', {
-  hideEchoBack: true
-});
-
-CONFIG.sourceDomain = readline.question('Domain: ');
+CONFIG.sourceUrl = process.argv[2]
+var sourceUsername = process.argv[3];
+var sourcePassword = process.argv[4];
+CONFIG.sourceDomain = process.argv[5];
 CONFIG.sourceToken = null;
 
 // ------
 
-console.log("Enter the target ODP details.");
+CONFIG.targetUrl = process.argv[6]
+var targetUsername = process.argv[7];
+var targetPassword = process.argv[8];
+CONFIG.targetDomain = process.argv[9];
 
-var targetHost = readline.question('Host: [' + DEFAULT.targetHostname + '] ', {
-  defaultInput: DEFAULT.targetHostname
-
-});
-
-var targetPort = readline.question('Port: [' + DEFAULT.port + '] ', {
-  defaultInput: DEFAULT.port
-});
-
-CONFIG.targetUrl = "http://" + targetHost + ":" + targetPort;
-
-var targetUsername = readline.question('Username: ');
-var targetPassword = readline.question('Password: ', {
-  hideEchoBack: true
-});
-
-CONFIG.targetDomain = readline.question('Domain: ');
 CONFIG.targetToken = null;
 
 var toBeExported = [];
@@ -92,11 +64,75 @@ function getServices(_url, _token, _domain){
 	    json: true,
 	}
 
-	if (readline.keyInYN('Export only active services? '))
+	if (process.argv[11] == "Y")
 		options.uri += '&filter={"domain":"' + _domain + '","status":"Active"}'
 	else
 		options.uri += '&filter={"domain":"' + _domain + '"}'
 	return req(options);
+}
+
+function enrichDefinition(_d) {
+	for (var key in _d) {
+		if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.definition) {
+			enrichDefinition(_d[key].definition._self.definition)
+		} else if(_d[key].properties && _d[key].properties.relatedTo) {
+			var newId = getNewId(_d[key].properties.relatedTo);
+			var props = _d[key].properties;
+			_d[key] = {};
+			_d[key]._newField = false;
+			_d[key].properties = props;
+			_d[key].properties.relatedTo = newId;
+			_d[key].properties._typeChanged = 'Relation';
+			_d[key].type = 'Relation';
+		}
+	}
+}
+
+function getRole(_url, _token, _serviceId) {
+
+	var options = {
+		method: "GET",
+		uri: _url + API.role + '?filter={"entity":"' + _serviceId + '"}',
+		headers: {
+			"Content-Type": "application/json",
+			"Authorization": "JWT " + _token
+		}
+	}
+	var res = reqSync(options.method, options.uri, options);
+	var resParsed = JSON.parse(res.getBody('utf8'));
+	var role = {};
+	role.fields = resParsed[0].fields;
+	role.roles = resParsed[0].roles;
+	return role;
+}
+
+function serviceAlreadyExists(_url, _token, _service) {
+
+	var options = {
+		method: "GET",
+		uri: _url + API.service + '/count?filter={"domain":"' + _service.domain + '","api":"' + _service.api + '"}',
+		headers: {
+			"Content-Type": "application/json",
+			"Authorization": "JWT " + _token
+		}
+	}
+	var res = reqSync(options.method, options.uri, options);
+	var count = eval(res.getBody('utf8'));
+	return (count > 0);
+}
+
+function getExistingService(_url, _token, _service) {
+
+	var options = {
+		method: "GET",
+		uri: _url + API.service + '?filter={"domain":"' + _service.domain + '","api":"' + _service.api + '"}',
+		headers: {
+			"Content-Type": "application/json",
+			"Authorization": "JWT " + _token
+		}
+	}
+	var res = reqSync(options.method, options.uri, options);
+	return JSON.parse(res.getBody('utf8'))[0];
 }
 
 function createDomain(_url, _token, _name, _description) {
@@ -129,7 +165,7 @@ function createService(_url, _token, _service) {
 	    json: _service
 	}
 	var res = reqSync(options.method, options.uri, options);
-	console.log("Created service: " + _service.name + " with id: " + _service._id);
+	console.log("Created service: " + _service.name + " with id: " + JSON.parse(res.getBody('utf8'))._id);
 	return JSON.parse(res.getBody('utf8'));
 }
 
@@ -172,7 +208,7 @@ function allServicesDone() {
 function createServices() {
 
 	getServices(CONFIG.sourceUrl, CONFIG.sourceToken, CONFIG.sourceDomain).then(_services => {
-		console.log("Creating services ...");
+		console.log("Migrating " + _services.length + " services ...");
 		_services.forEach((service, i) => {
 
 			service.ocmId = "";
@@ -183,52 +219,49 @@ function createServices() {
 
 		do {
 
-			sleep.sleep(2);
-
 			toBeExported.forEach((service, i) => {
 
 				if(!service.ocmExported) {
 
-					var s = {};
-					s.api = service.api;
-					s.attributeList = service.attributeList;
-					s.definition = JSON.parse(service.definition);
-					s.description = service.description;
-					s.domain = CONFIG.targetDomain;
-					s.name = service.name;
-					s.preHooks = service.preHooks;
-					s.tags = service.tags;
-					s.version = 1;
-					s.versionValidity = service.versionValidity;
-					s.webHooks = service.webHooks;
-					s.wizard = service.wizard;
+					if(!serviceAlreadyExists(CONFIG.targetUrl, CONFIG.targetToken, service)) {
 
-					if(service.relatedSchemas.outgoing && service.relatedSchemas.outgoing.length > 0) {
-						if(allDependenciesDone(service)) {
-							for (var key in s.definition) {
-								if(s.definition[key].properties && s.definition[key].properties.relatedTo) {
-									var newId = getNewId(s.definition[key].properties.relatedTo);
-									var props = s.definition[key].properties;
-									s.definition[key] = {};
-									s.definition[key]._newField = false;
-									s.definition[key].properties = props;
-									s.definition[key].properties.relatedTo = newId;
-									s.definition[key].properties._typeChanged = 'Relation';
-									s.definition[key].type = 'Relation';
-								}
+						var s = {};
+						s.api = service.api;
+						s.attributeList = service.attributeList;
+						s.definition = JSON.parse(service.definition);
+						s.description = service.description;
+						s.domain = CONFIG.targetDomain;
+						s.name = service.name;
+						s.preHooks = service.preHooks;
+						s.tags = service.tags;
+						s.version = 1;
+						s.versionValidity = service.versionValidity;
+						s.webHooks = service.webHooks;
+						s.wizard = service.wizard;
+						s.role = getRole(CONFIG.sourceUrl, CONFIG.sourceToken, service._id);
+
+						if(service.relatedSchemas.outgoing && service.relatedSchemas.outgoing.length > 0) {
+							if(allDependenciesDone(service)) {
+								enrichDefinition(s.definition);
+								var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
+								service.ocmId = _remoteService._id
+								service.ocmExported = true;
+								sleep.sleep(60);
+							} else {
+								console.log("Skipping service: " + service.name + ", not all dependencies have been created ...");
 							}
 
+						} else {
 							var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
 							service.ocmId = _remoteService._id
 							service.ocmExported = true;
-						} else {
-							console.log("Skipping service: " + service.name + ", not all dependencies have been created ...");
+							sleep.sleep(60);
 						}
 
 					} else {
-						var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
-						service.ocmId = _remoteService._id
 						service.ocmExported = true;
+						service.ocmId = getExistingService(CONFIG.targetUrl, CONFIG.targetToken, service)._id;
+						console.log("Skipping service: " + service.name + ", service already exists: " + service.ocmId);
 					}
 
 				}
@@ -250,9 +283,9 @@ login(CONFIG.sourceUrl, sourceUsername, sourcePassword).then(_sd => {
 		console.log("Logged in to the target ODP.");
 		CONFIG.targetToken = _td.token;
 
-		if (readline.keyInYN('Do you want to create the domain? ')) {
+		if (process.argv[10] == "Y") {
 			console.log("Creating domain ...");
-			createDomain(CONFIG.targetUrl, CONFIG.targetToken, CONFIG.targetDomain, "This domain was cloned.").then(_domain => {	
+			createDomain(CONFIG.targetUrl, CONFIG.targetToken, CONFIG.targetDomain, "").then(_domain => {	
 				console.log("Created domain.");
 				createServices();
 			});
