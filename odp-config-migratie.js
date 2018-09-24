@@ -101,7 +101,7 @@ function getRole(_url, _token, _serviceId) {
 	var res = reqSync(options.method, options.uri, options);
 	var resParsed = JSON.parse(res.getBody('utf8'));
 	var role = {};
-	role.fields = resParsed[0].fields;
+	role.fields = JSON.parse(resParsed[0].fields);
 	role.roles = resParsed[0].roles;
 	return role;
 }
@@ -155,6 +155,7 @@ function createDomain(_url, _token, _name, _description) {
 
 function createService(_url, _token, _service) {
 	console.log("Creating service " + _service.name + " ... ");
+	// console.log(JSON.stringify(_service));
 	var options = {
 		method: "POST",
 		uri: _url + API.service,
@@ -227,7 +228,13 @@ function createServices() {
 
 						var s = {};
 						s.api = service.api;
-						s.attributeList = service.attributeList;
+						s.attributeList = [];
+						service.attributeList.forEach((attribute) => {
+							s.attributeList.push({
+								key: attribute.key,
+								name: attribute.name
+							})
+						})
 						s.definition = JSON.parse(service.definition);
 						s.description = service.description;
 						s.domain = CONFIG.targetDomain;
@@ -237,7 +244,13 @@ function createServices() {
 						s.version = 1;
 						s.versionValidity = service.versionValidity;
 						s.webHooks = service.webHooks;
-						s.wizard = service.wizard;
+						s.wizard = [];
+						service.wizard.forEach((wizard) => {
+							s.wizard.push({
+								fields: wizard.fields,
+								name: wizard.name
+							})
+						})
 						s.role = getRole(CONFIG.sourceUrl, CONFIG.sourceToken, service._id);
 
 						if(service.relatedSchemas.outgoing && service.relatedSchemas.outgoing.length > 0) {
@@ -246,7 +259,7 @@ function createServices() {
 								var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
 								service.ocmId = _remoteService._id
 								service.ocmExported = true;
-								sleep.sleep(60);
+								sleep.sleep(20);
 							} else {
 								console.log("Skipping service: " + service.name + ", not all dependencies have been created ...");
 							}
@@ -255,7 +268,7 @@ function createServices() {
 							var _remoteService = createService(CONFIG.targetUrl, CONFIG.targetToken, s);
 							service.ocmId = _remoteService._id
 							service.ocmExported = true;
-							sleep.sleep(60);
+							sleep.sleep(20);
 						}
 
 					} else {
