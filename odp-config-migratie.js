@@ -72,9 +72,14 @@ function getServices(_url, _token, _domain){
 }
 
 function enrichDefinition(_d) {
+	// console.log(JSON.stringify(_d));
+	// console.log("----");
 	for (var key in _d) {
-		if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.definition) {
-			enrichDefinition(_d[key].definition._self.definition)
+		if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.properties) {
+			enrichDefinition(_d[key].definition._self.definition);
+		}
+		else if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.definition) {
+			enrichDefinition(_d[key].definition._self.definition);
 		} else if(_d[key].properties && _d[key].properties.relatedTo) {
 			var newId = getNewId(_d[key].properties.relatedTo);
 			var props = _d[key].properties;
@@ -245,12 +250,14 @@ function createServices() {
 						s.versionValidity = service.versionValidity;
 						s.webHooks = service.webHooks;
 						s.wizard = [];
-						service.wizard.forEach((wizard) => {
-							s.wizard.push({
-								fields: wizard.fields,
-								name: wizard.name
+						if(service.wizard) {
+							service.wizard.forEach((wizard) => {
+								s.wizard.push({
+									fields: wizard.fields,
+									name: wizard.name
+								})
 							})
-						})
+						}
 						s.role = getRole(CONFIG.sourceUrl, CONFIG.sourceToken, service._id);
 
 						if(service.relatedSchemas.outgoing && service.relatedSchemas.outgoing.length > 0) {
