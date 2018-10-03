@@ -1,5 +1,3 @@
-// TODO: error handling
-
 var clear = require('clear');
 clear();
 
@@ -28,8 +26,6 @@ var sourceUsername = process.argv[3];
 var sourcePassword = process.argv[4];
 CONFIG.sourceDomain = process.argv[5];
 CONFIG.sourceToken = null;
-
-// ------
 
 CONFIG.targetUrl = process.argv[6]
 var targetUsername = process.argv[7];
@@ -72,19 +68,13 @@ function getServices(_url, _token, _domain){
 }
 
 function enrichDefinition(_d) {
-	// console.log(JSON.stringify(_d));
-	// console.log("----");
 	for (var key in _d) {
-		// console.log("key = " + key);
 		if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.properties) {
-			// console.log("here for group of arrays");
 			enrichDefinition(_d[key].definition._self.definition);
 		}
 		else if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.definition) {
-			// console.log("here again");
 			enrichDefinition(_d[key].definition._self.definition);
 		} else if(_d[key].properties && _d[key].properties.relatedTo) {
-			// console.log("will replace");
 			var newId = getNewId(_d[key].properties.relatedTo);
 			console.log(_d[key].properties.relatedTo);
 			console.log(newId);
@@ -97,7 +87,6 @@ function enrichDefinition(_d) {
 			_d[key].type = 'Relation';
 		}
 		else if(_d[key].definition && _d[key].type == 'Object' && _d[key].definition) {
-			// console.log("here");
 			console.log(JSON.stringify(_d[key].definition));
 			enrichDefinition(_d[key].definition);
 		}
