@@ -75,13 +75,19 @@ function enrichDefinition(_d) {
 	// console.log(JSON.stringify(_d));
 	// console.log("----");
 	for (var key in _d) {
+		// console.log("key = " + key);
 		if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.properties) {
+			// console.log("here for group of arrays");
 			enrichDefinition(_d[key].definition._self.definition);
 		}
 		else if(_d[key].definition && _d[key].type == 'Array' && _d[key].definition._self.definition) {
+			// console.log("here again");
 			enrichDefinition(_d[key].definition._self.definition);
 		} else if(_d[key].properties && _d[key].properties.relatedTo) {
+			// console.log("will replace");
 			var newId = getNewId(_d[key].properties.relatedTo);
+			console.log(_d[key].properties.relatedTo);
+			console.log(newId);
 			var props = _d[key].properties;
 			_d[key] = {};
 			_d[key]._newField = false;
@@ -89,6 +95,11 @@ function enrichDefinition(_d) {
 			_d[key].properties.relatedTo = newId;
 			_d[key].properties._typeChanged = 'Relation';
 			_d[key].type = 'Relation';
+		}
+		else if(_d[key].definition && _d[key].type == 'Object' && _d[key].definition) {
+			// console.log("here");
+			console.log(JSON.stringify(_d[key].definition));
+			enrichDefinition(_d[key].definition);
 		}
 	}
 }
